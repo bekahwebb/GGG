@@ -27,6 +27,11 @@ gggTest <- read_csv('test.csv')
 gggTrain <- read_csv('train.csv')
 gggTrainNA <- read_csv('trainWithMissingValues.csv') 
 gggTrain
+gggTrainNA
+
+#factor type and color for na data
+gggTrainNA$color = factor(gggTrainNA$color)
+gggTrainNA$type = factor(gggTrainNA$type)
 
 #eda
 ggplot(data=gggTrain, aes(x=type, y=bone_length)) +
@@ -35,7 +40,7 @@ geom_boxplot()
 ggplot(data=gggTrain) + geom_mosaic(aes(x=product(color), fill=type))
 
 #recipe
-ggg_recipe <- recipe(type~., data = gggTrain) %>% 
+ggg_recipe <- recipe(type~., data = gggTrainNA) %>% 
   step_impute_median(all_numeric_predictors())
 
 prep <- prep(ggg_recipe) 
@@ -43,4 +48,4 @@ baked <- bake(prep, new_data = gggTrainNA)
 
 #calculate the rmse
 rmse_vec(gggTrain[is.na(gggTrainNA)], baked[is.na(gggTrainNA)])
-#[1] 0.1516811
+#0.1520589
