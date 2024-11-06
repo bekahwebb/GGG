@@ -23,29 +23,90 @@ library(embed)
 library(themis)
 library(parsnip)
 
-gggTest <- read_csv('test.csv')
-gggTrain <- read_csv('train.csv')
-gggTrainNA <- read_csv('trainWithMissingValues.csv') 
-gggTrain
-gggTrainNA
+ggg_test <- read_csv('test.csv')
+ggg_train <- read_csv('train.csv')
+ggg_trainNA <- read_csv('trainWithMissingValues.csv') 
+# ggg_train
+# ggg_trainNA
 
 #factor type and color for na data
 gggTrainNA$color = factor(gggTrainNA$color)
 gggTrainNA$type = factor(gggTrainNA$type)
 
 #eda
-ggplot(data=gggTrain, aes(x=type, y=bone_length)) +
+ggplot(data=ggg_train, aes(x=type, y=bone_length)) +
 geom_boxplot()
 
-ggplot(data=gggTrain) + geom_mosaic(aes(x=product(color), fill=type))
+ggplot(data=ggg_train) + geom_mosaic(aes(x=product(color), fill=type))
 
 #recipe
-ggg_recipe <- recipe(type~., data = gggTrainNA) %>% 
+ggg_recipe <- recipe(type~., data = ggg_trainNA) %>% 
   step_impute_median(all_numeric_predictors())
 
 prep <- prep(ggg_recipe) 
-baked <- bake(prep, new_data = gggTrainNA)  
+baked <- bake(prep, new_data = ggg_trainNA)  
 
 #calculate the rmse
-rmse_vec(gggTrain[is.na(gggTrainNA)], baked[is.na(gggTrainNA)])
+rmse_vec(ggg_train[is.na(gggTrainNA)], baked[is.na(ggg_trainNA)])
 #0.1520589
+
+
+#try a random forest model for this dataset
+
+#my recipe
+# Feature Engineering
+ggg_recipe <- recipe(type~., data=ggg_train) %>%
+  step_dummy(color) %>% 
+  step_range(all_numeric_predictors(), min = 0, max = 1)
+
+rf_ggg_model <- rand_forest(mtry = tune(),
+                        min_n=tune(),
+                        trees=500) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+## Create a workflow with model & recipe
+
+rf_wf <- workflow() %>%
+  add_recipe(ggg_recipe) %>%
+  add_model(rf_ggg_model)
+
+## Set up grid of tuning values
+rf_tunegrid <- grid_regular(mtry(range = c(1, 10)),
+                            min_n(),
+                            levels = 3) 
+
+## Set up K-fold CV
+folds <- vfold_cv(ggg_train, v = 10, repeats=1)
+
+## Run the CV
+CV_results <- rf_wf %>%
+  tune_grid(resamples=folds,
+            grid=rf_tunegrid,
+            metrics=metric_set(accuracy)) 
+
+## Find best tuning parameters
+bestTune <- CV_results %>%
+  select_best(metric = "accuracy") 
+
+## Finalize workflow and predict
+final_wf <-
+  rf_wf %>%
+  finalize_workflow(bestTune) %>%
+  fit(data=ggg_train)
+
+## Predict
+rf_ggg_predictions <- final_wf %>%
+  predict(new_data =ggg_test, type="class")
+
+
+## Format the Predictions for Submission to Kaggle
+rf_ggg_kaggle_submission <- rf_ggg_predictions%>%
+  rename(type=.pred_class) %>%
+  bind_cols(., ggg_test) %>% #Bind predictions with test data
+  select(id, type)  #keep Id, ACTION for submission
+
+
+## Write out the file
+vroom_write(x=rf_ggg_kaggle_submission, file="rfGGGPreds.csv", delim=",")
+#public score of .71455
