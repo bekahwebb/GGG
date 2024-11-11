@@ -1,0 +1,204 @@
+
+R version 4.3.3 (2024-02-29) -- "Angel Food Cake"
+Copyright (C) 2024 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> #11/11/24 boosting and bart
+> library(tidyverse)
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ dplyr     1.1.4     ✔ readr     2.1.5
+✔ forcats   1.0.0     ✔ stringr   1.5.1
+✔ ggplot2   3.5.1     ✔ tibble    3.2.1
+✔ lubridate 1.9.3     ✔ tidyr     1.3.1
+✔ purrr     1.0.2     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+> library(DataExplorer)
+> library(vroom)
+
+Attaching package: ‘vroom’
+
+The following objects are masked from ‘package:readr’:
+
+    as.col_spec, col_character, col_date, col_datetime, col_double,
+    col_factor, col_guess, col_integer, col_logical, col_number,
+    col_skip, col_time, cols, cols_condense, cols_only, date_names,
+    date_names_lang, date_names_langs, default_locale, fwf_cols,
+    fwf_empty, fwf_positions, fwf_widths, locale, output_column,
+    problems, spec
+
+> library(ggplot2)
+> library(tidyverse)
+> library(patchwork)
+> library(readr)
+> library(GGally)
+Registered S3 method overwritten by 'GGally':
+  method from   
+  +.gg   ggplot2
+> library(poissonreg)
+Loading required package: parsnip
+> library(recipes)
+
+Attaching package: ‘recipes’
+
+The following object is masked from ‘package:stringr’:
+
+    fixed
+
+The following object is masked from ‘package:stats’:
+
+    step
+
+> library(rsample)
+> library(magrittr)
+
+Attaching package: ‘magrittr’
+
+The following object is masked from ‘package:purrr’:
+
+    set_names
+
+The following object is masked from ‘package:tidyr’:
+
+    extract
+
+> library(tidymodels)
+── Attaching packages ────────────────────────────────────── tidymodels 1.2.0 ──
+✔ broom        1.0.7     ✔ tune         1.2.1
+✔ dials        1.3.0     ✔ workflows    1.1.4
+✔ infer        1.0.7     ✔ workflowsets 1.1.0
+✔ modeldata    1.4.0     ✔ yardstick    1.3.1
+── Conflicts ───────────────────────────────────────── tidymodels_conflicts() ──
+✖ scales::discard()     masks purrr::discard()
+✖ magrittr::extract()   masks tidyr::extract()
+✖ dplyr::filter()       masks stats::filter()
+✖ recipes::fixed()      masks stringr::fixed()
+✖ dplyr::lag()          masks stats::lag()
+✖ magrittr::set_names() masks purrr::set_names()
+✖ yardstick::spec()     masks vroom::spec(), readr::spec()
+✖ recipes::step()       masks stats::step()
+• Dig deeper into tidy modeling with R at https://www.tmwr.org
+> library(lubridate)
+> library(poissonreg) #if you want to do penalized, poisson regression
+> library(rpart)
+
+Attaching package: ‘rpart’
+
+The following object is masked from ‘package:dials’:
+
+    prune
+
+> library(ranger)
+> library(stacks) # you need this library to create a stacked model
+> library(embed) # for target encoding
+> library(ggmosaic)
+
+Attaching package: ‘ggmosaic’
+
+The following object is masked from ‘package:GGally’:
+
+    happy
+
+> library(vroom)
+> library(embed)
+> library(themis)
+> library(parsnip)
+> library(discrim)
+
+Attaching package: ‘discrim’
+
+The following object is masked from ‘package:dials’:
+
+    smoothness
+
+> library('naivebayes')
+naivebayes 1.0.0 loaded
+For more information please visit: 
+https://majkamichal.github.io/naivebayes/
+> library(bonsai)
+> library(lightgbm)
+> library("dbarts")
+
+Attaching package: ‘dbarts’
+
+The following object is masked from ‘package:magrittr’:
+
+    extract
+
+The following object is masked from ‘package:parsnip’:
+
+    bart
+
+The following object is masked from ‘package:tidyr’:
+
+    extract
+
+> 
+> ggg_test <- read_csv('test.csv')
+Rows: 529 Columns: 6
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr (1): color
+dbl (5): id, bone_length, rotting_flesh, hair_length, has_soul
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+> ggg_train <- read_csv('train.csv')
+Rows: 371 Columns: 7
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+chr (2): color, type
+dbl (5): id, bone_length, rotting_flesh, hair_length, has_soul
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+> 
+> ggg_recipe <- recipe(type~., data = ggg_train) %>%
++   step_mutate(type = as.factor(type), skip = TRUE) %>%
++   step_mutate(color = as.factor(color)) %>% 
++   step_dummy(color) %>% # Turn color to factor then dummy encode color
++   step_mutate(id, features = id) %>%
++   step_range(all_numeric_predictors(), min = 0, max = 1)
+> 
+> boost_model <- boost_tree(tree_depth=tune(),
++                           trees=tune(),
++                           learn_rate=tune()) %>%
++   set_engine("lightgbm") %>% #or "xgboost" but lightgbm is faster
++   set_mode("classification")
+> 
+> #set workflow
+> boost_wf <- workflow() %>%
++   add_recipe(ggg_recipe) %>%
++   add_model(boost_model)
+> 
+> 
+> ## CV tune, finalize and predict here and save results
+> ## Set up grid of tuning values
+> boost_tunegrid <- grid_regular(tree_depth(), 
++                                trees(), 
++                                learn_rate(),levels = 5) 
+> 
+> ## Set up K-fold CV
+> folds <- vfold_cv(ggg_train, v = 5, repeats=1)
+> 
+> ## Run the CV
+> CV_results <- boost_wf %>%
++   tune_grid(resamples=folds,
++             grid=boost_tunegrid,
++             metrics=metric_set(roc_auc)) 
