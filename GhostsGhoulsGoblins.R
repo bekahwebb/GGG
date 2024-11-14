@@ -178,7 +178,7 @@ naivebayes_ggg_kaggle_submission <- ggg_predictions%>%
 
 ## Write out the file
 vroom_write(x=naivebayes_ggg_kaggle_submission, file="nbGGGPreds.csv", delim=",")
-#public score 0.75047, done, the cutoff is .747
+#public score 0.75047, done, the cutoff is .747 
 
 #neural networks 11/8/24
 nn_recipe <- recipe(type~., data = ggg_train) %>%
